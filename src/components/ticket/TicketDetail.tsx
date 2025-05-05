@@ -58,6 +58,7 @@ const TicketDetail = () => {
     }, [id]);
 
     const updateTicketStatus = useCallback(async (status: string, comment?: string) => {
+        // debugger;
         try {
             const token = localStorage.getItem('token');
             // console.log('Updating ticket status to:', status);
@@ -70,7 +71,7 @@ const TicketDetail = () => {
             );
 
             // Jika ada komentar, tambahkan komentar
-            if (comment && !hasUpdatedStatus) {
+            if (comment && !hasUpdatedStatus && !showResolveForm) {
                 await axios.post(
                     `http://localhost:5000/api/tickets/${id}/comments`,
                     { comment },
@@ -85,9 +86,8 @@ const TicketDetail = () => {
             }
             
             // Refresh data tiket
-            setHasUpdatedStatus(true);
             const updatedTicket = await fetchTicket();
-            
+            setHasUpdatedStatus(true);
             return updatedTicket;
         } catch (error) {
             console.error('Error updating ticket:', error);
@@ -109,54 +109,53 @@ const TicketDetail = () => {
         }
     }, [id]);
 
+    // 
+    
     useEffect(() => {
-        const user = JSON.parse(localStorage.getItem('user') || '{}');
-        const userIsAdmin = user.role === 'admin';
-        setIsAdmin(userIsAdmin);
-        
-        // Fetch data tiket dan komentar untuk semua user
-        const fetchData = async () => {
-            try {
-                const ticketData = await fetchTicket();
-                await fetchComments();
-                
-                // Jika admin dan status tiket 'open', ubah ke 'in_progress'
-                if (userIsAdmin && ticketData.status === 'open' && !hasUpdatedStatus) {
-                    console.log('Updating ticket status to in_progress');
-                    try {
-                        // Update status dengan komentar
-                        await updateTicketStatus('in_progress', 'Tiket sedang ditangani oleh admin');
-                        // setHasUpdatedStatus(true);
-                    } catch (error) {
-                        console.error('Gagal mengupdate status tiket:', error);
-                    }
-                }
-            } catch (error) {
-                console.error('Error fetching data:', error);
-                setLoading(false);
+    const user = JSON.parse(localStorage.getItem('user') || '{}');
+    const userIsAdmin = user.role === 'admin';
+    setIsAdmin(userIsAdmin);
+
+    let didUpdate = false;
+
+    const fetchData = async () => {
+        try {
+            const ticketData = await fetchTicket();
+            await fetchComments();
+
+            // Cek status tiket dan update jika admin
+            if (userIsAdmin && ticketData.status === 'open' && !didUpdate && !hasUpdatedStatus) {
+                didUpdate = true; // Local flag to prevent multiple updates
+                await updateTicketStatus('in_progress', 'Tiket sedang ditangani oleh admin');
+                setHasUpdatedStatus(true);
             }
-        };
-        
-        fetchData();
-    }, [fetchTicket, fetchComments, updateTicketStatus, hasUpdatedStatus]);
+        } catch (error) {
+            console.error('Error fetching data:', error);
+            setLoading(false);
+        }
+    };
+
+    fetchData();
+}, [fetchTicket, fetchComments, hasUpdatedStatus]);
+
 
     const handleAddComment = async (e: React.FormEvent) => {
-        // e.preventDefault();
-        // if (!newComment.trim()) return;
+        e.preventDefault();
+        if (!newComment.trim()) return;
 
-        // try {
-        //     const token = localStorage.getItem('token');
-        //     await axios.post(
-        //         `http://localhost:5000/api/tickets/${id}/comments`,
-        //         { comment: newComment },
-        //         { headers: { Authorization: `Bearer ${token}` } }
-        //     );
-        //     setNewComment('');
-        //     fetchComments();
-        // } catch (error) {
-        //     console.error('Error adding comment:', error);
-        //     alert('Gagal menambahkan komentar');
-        // }
+        try {
+            const token = localStorage.getItem('token');
+            await axios.post(
+                `http://localhost:5000/api/tickets/${id}/comments`,
+                { comment: newComment },
+                { headers: { Authorization: `Bearer ${token}` } }
+            );
+            setNewComment('');
+            fetchComments();
+        } catch (error) {
+            console.error('Error adding comment:', error);
+            alert('Gagal menambahkan komentar');
+        }
     };
 
 
